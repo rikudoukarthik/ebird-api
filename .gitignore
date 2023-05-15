@@ -4,5 +4,8 @@
 .Ruserdata
 
 *.csv
+*.xlsx
 
 token.R
+
+data/

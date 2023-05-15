@@ -62,7 +62,48 @@ write_spec_tally <- function(region)
     response <- jsonlite::prettify(rawToChar(req$content))
     parsed <- jsonlite::fromJSON(response, flatten = FALSE)
   }
-  speciesList <- cbind(parsed$comName)
+  speciesList <- cbind(region, parsed$comName)
+  
+  if(is.null(parsed$comName)) {
+    speciesList <- cbind(speciesList, comName = NA_real_)
+  }
   
   return(speciesList)
+}
+
+
+get_notable_spec <- function(region, back, maxResults = 5) {
+  
+  date <- paste(year, month, day, sep = "/")
+  h <- new_handle()
+  
+  # myebirdtoken should be assigned in token.R
+  handle_setheaders(h, "X-eBirdApiToken" = myebirdtoken)
+  req <- curl_fetch_memory(paste("https://api.ebird.org/v2/data/obs", region,"recent", "notable",
+                                 sep = "/"),
+                           h)
+  
+  Sys.sleep(0.2)     
+  return(req)
+  
+}
+
+write_notable_spec <- function(region)
+{  
+  print(region)
+  req <- get_notable_spec(region)
+  
+  if(req$status_code == 200)
+  {
+    response <- jsonlite::prettify(rawToChar(req$content))
+    parsed <- jsonlite::fromJSON(response, flatten = FALSE)
+  }
+  speciesList <- cbind(region, parsed$comName, parsed$subId)
+
+  if(is.null(parsed$comName)) {
+    speciesList <- cbind(speciesList, comName = NA_real_, subId = NA_real_)
+  }
+  
+  return(speciesList)
+  
 }
