@@ -29,9 +29,10 @@ temp3 <- region_codes %>% filter(str_detect(COUNTY.CODE, cur_region)) %>% distin
 regions <- c(temp1$COUNTRY.CODE, temp2$STATE.CODE, temp3$COUNTY.CODE)
 
 
-write_path_species <- "outputs/HBC2023/IN-UL_SpeciesList.csv"
-write_path_notablespecies <- "outputs/HBC2023/IN-UL_SpeciesList_Notable.csv"
-write_path_participation <- "outputs/HBC2023/IN-UL_Participation.xlsx"
+write_path_speciesperregion <- "outputs/IN-KL_SpeciesPerRegion.csv"
+write_path_species <- "outputs/IN-KL_SpeciesList.csv"
+write_path_notablespecies <- "outputs/IN-KL_SpeciesList_Notable.csv"
+write_path_participation <- "outputs/IN-KL_Participation.xlsx"
 
 
 ebd <- read_csv("eBirdTaxonomy.csv") %>% 
@@ -45,7 +46,11 @@ ebd <- read_csv("eBirdTaxonomy.csv") %>%
 temp_spec <- map(regions, write_spec_tally) %>% 
   list_c() %>% 
   as.data.frame() %>% 
-  magrittr::set_colnames(c("EBIRD.REGION", "ENGLISH.NAME"))
+  magrittr::set_colnames(c("EBIRD.REGION", "ENGLISH.NAME")) %>%
+  group_by(EBIRD.REGION) %>% 
+  summarise(NO.SP = n_distinct(ENGLISH.NAME))
+# save
+write_csv(x = temp_spec, file = write_path_speciesperregion)
 
 combined_species <- temp_spec %>% 
   distinct(ENGLISH.NAME) %>% 
@@ -53,7 +58,7 @@ combined_species <- temp_spec %>%
   mutate(SORT.V2021 = as.numeric(SORT.V2021)) %>% 
   arrange(SORT.V2021) %>% 
   dplyr::select(-SORT.V2021)
-
+# save
 write_csv(x = combined_species, file = write_path_species)
 
 
@@ -73,36 +78,36 @@ participation_st <- map(regions, write_obs_tally) %>%
 
 # participation stats for country (states within the country)
 
-regions_nat <- region_codes %>% 
-  filter(COUNTRY == "India") %>% 
-  distinct(STATE.CODE) %>% 
-  mutate(REGION.NAME = "India") %>% 
-  rename(EBIRD.REGION = STATE.CODE)
-
-in_spec <- temp_spec %>%
-  left_join(regions_nat) %>%
-  filter(REGION.NAME == "India") %>%
-  group_by(REGION.NAME) %>%
-  dplyr::summarise(SPECIES = n_distinct(ENGLISH.NAME))
-
-# cannot calculate no. of observers, because no way to remove duplicates across states
-participation_nat <- map(regions_nat[,1], write_obs_tally) %>%
-  list_c() %>%
-  as.data.frame() %>%
-  magrittr::set_colnames(c("EBIRD.REGION", "CHECKLISTS", "SPECIES", "OBSERVERS")) %>%
-  mutate(across(c(everything(), -EBIRD.REGION), ~ as.numeric(.))) %>%
-  left_join(regions_nat) %>%
-  mutate(EBIRD.REGION = NULL) %>%
-  group_by(REGION.NAME) %>%
-  dplyr::summarise(CHECKLISTS = sum(CHECKLISTS),
-                   SPECIES = sum(SPECIES)) %>%
-  # will add correct no.sp for India by joining
-  mutate(SPECIES = ifelse(REGION.NAME == "India", NA_real_, SPECIES)) %>%
-  left_join(in_spec, by = "REGION.NAME") %>%
-  mutate(SPECIES = coalesce(SPECIES.x, SPECIES.y),
-         SPECIES.x = NULL,
-         SPECIES.y = NULL) %>%
-  arrange(desc(CHECKLISTS), desc(SPECIES))
+# regions_nat <- region_codes %>% 
+#   filter(COUNTRY == "India") %>% 
+#   distinct(STATE.CODE) %>% 
+#   mutate(REGION.NAME = "India") %>% 
+#   rename(EBIRD.REGION = STATE.CODE)
+# 
+# in_spec <- temp_spec %>%
+#   left_join(regions_nat) %>%
+#   filter(REGION.NAME == "India") %>%
+#   group_by(REGION.NAME) %>%
+#   dplyr::summarise(SPECIES = n_distinct(ENGLISH.NAME))
+# 
+# # cannot calculate no. of observers, because no way to remove duplicates across states
+# participation_nat <- map(regions_nat[,1], write_obs_tally) %>%
+#   list_c() %>%
+#   as.data.frame() %>%
+#   magrittr::set_colnames(c("EBIRD.REGION", "CHECKLISTS", "SPECIES", "OBSERVERS")) %>%
+#   mutate(across(c(everything(), -EBIRD.REGION), ~ as.numeric(.))) %>%
+#   left_join(regions_nat) %>%
+#   mutate(EBIRD.REGION = NULL) %>%
+#   group_by(REGION.NAME) %>%
+#   dplyr::summarise(CHECKLISTS = sum(CHECKLISTS),
+#                    SPECIES = sum(SPECIES)) %>%
+#   # will add correct no.sp for India by joining
+#   mutate(SPECIES = ifelse(REGION.NAME == "India", NA_real_, SPECIES)) %>%
+#   left_join(in_spec, by = "REGION.NAME") %>%
+#   mutate(SPECIES = coalesce(SPECIES.x, SPECIES.y),
+#          SPECIES.x = NULL,
+#          SPECIES.y = NULL) %>%
+#   arrange(desc(CHECKLISTS), desc(SPECIES))
 
 write_xlsx(path = write_path_participation,
            list(States = participation_st
