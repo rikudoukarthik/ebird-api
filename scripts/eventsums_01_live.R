@@ -14,13 +14,13 @@ load("data/region_codes.RData")
 ###
 
 
-day <- 13
-month <- 05
+day <- 23
+month <- 08
 year <- 2023
 
 
 # main regions
-cur_region <- c("IN-UL")
+cur_region <- c("IN-KL") # can add other states here if needed
 
 temp1 <- region_codes %>% filter(str_detect(COUNTRY.CODE, cur_region)) %>% distinct(COUNTRY.CODE)
 temp2 <- region_codes %>% filter(str_detect(STATE.CODE, cur_region)) %>% distinct(STATE.CODE)
@@ -40,6 +40,8 @@ ebd <- read_csv("eBirdTaxonomy.csv") %>%
 
 ###
 
+# list of species recorded
+
 temp_spec <- map(regions, write_spec_tally) %>% 
   list_c() %>% 
   as.data.frame() %>% 
@@ -55,6 +57,7 @@ combined_species <- temp_spec %>%
 write_csv(x = combined_species, file = write_path_species)
 
 
+# participation stats for the state (district-level stats not working in API currently)
 
 participation_st <- map(regions, write_obs_tally) %>% 
   list_c() %>% 
@@ -68,35 +71,46 @@ participation_st <- map(regions, write_obs_tally) %>%
            CHECKLISTS, SPECIES, OBSERVERS)
 
 
-# in_spec <- temp_spec %>% 
-#   left_join(regions_nat) %>% 
-#   filter(REGION.NAME == "India") %>% 
-#   group_by(REGION.NAME) %>% 
-#   dplyr::summarise(SPECIES = n_distinct(ENGLISH.NAME))
-# 
-# participation_nat <- map(regions_nat[,1], write_obs_tally) %>% 
-#   list_c() %>% 
-#   as.data.frame() %>% 
-#   magrittr::set_colnames(c("EBIRD.REGION", "CHECKLISTS", "SPECIES", "OBSERVERS")) %>% 
-#   mutate(across(c(everything(), -EBIRD.REGION), ~ as.numeric(.))) %>% 
-#   left_join(regions_nat) %>% 
-#   mutate(EBIRD.REGION = NULL) %>% 
-#   group_by(REGION.NAME) %>% 
-#   dplyr::summarise(CHECKLISTS = sum(CHECKLISTS),
-#                    SPECIES = sum(SPECIES)) %>% 
-#   # will add correct no.sp for India by joining
-#   mutate(SPECIES = ifelse(REGION.NAME == "India", NA_real_, SPECIES)) %>% 
-#   left_join(in_spec, by = "REGION.NAME") %>% 
-#   mutate(SPECIES = coalesce(SPECIES.x, SPECIES.y),
-#          SPECIES.x = NULL,
-#          SPECIES.y = NULL) %>% 
-#   arrange(desc(CHECKLISTS), desc(SPECIES))
+# participation stats for country (states within the country)
+
+regions_nat <- region_codes %>% 
+  filter(COUNTRY == "India") %>% 
+  distinct(STATE.CODE) %>% 
+  mutate(REGION.NAME = "India") %>% 
+  rename(EBIRD.REGION = STATE.CODE)
+
+in_spec <- temp_spec %>%
+  left_join(regions_nat) %>%
+  filter(REGION.NAME == "India") %>%
+  group_by(REGION.NAME) %>%
+  dplyr::summarise(SPECIES = n_distinct(ENGLISH.NAME))
+
+# cannot calculate no. of observers, because no way to remove duplicates across states
+participation_nat <- map(regions_nat[,1], write_obs_tally) %>%
+  list_c() %>%
+  as.data.frame() %>%
+  magrittr::set_colnames(c("EBIRD.REGION", "CHECKLISTS", "SPECIES", "OBSERVERS")) %>%
+  mutate(across(c(everything(), -EBIRD.REGION), ~ as.numeric(.))) %>%
+  left_join(regions_nat) %>%
+  mutate(EBIRD.REGION = NULL) %>%
+  group_by(REGION.NAME) %>%
+  dplyr::summarise(CHECKLISTS = sum(CHECKLISTS),
+                   SPECIES = sum(SPECIES)) %>%
+  # will add correct no.sp for India by joining
+  mutate(SPECIES = ifelse(REGION.NAME == "India", NA_real_, SPECIES)) %>%
+  left_join(in_spec, by = "REGION.NAME") %>%
+  mutate(SPECIES = coalesce(SPECIES.x, SPECIES.y),
+         SPECIES.x = NULL,
+         SPECIES.y = NULL) %>%
+  arrange(desc(CHECKLISTS), desc(SPECIES))
 
 write_xlsx(path = write_path_participation,
            list(States = participation_st
                 # Countries = participation_nat
                 ))
 
+
+# list of notable species recorded (highlights)
 
 notable_spec <- map(regions, write_notable_spec) %>%
   list_c() %>%
