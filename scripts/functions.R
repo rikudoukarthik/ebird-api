@@ -18,18 +18,40 @@ get_dates <- function(dates_cur = lubridate::today()) {
   
 }
 
+
+# eBird API functions ---------------------------------------------------------------
+
 # admin units based on eBird 
 get_admin_codes <- function(unit_code, hi_arch = TRUE) {
   
-  # list of region codes
-  load("data/region_codes.RData")
+  if (!exists("all_units")) {
+    
+    list_countries <- ebirdsubregionlist("country", key = myebirdtoken)
+    
+    parent_code <- str_sub(unit_code, 1, 2)
+    list_states <- ebirdsubregionlist("subnational1", parent_code, key = myebirdtoken)
+    list_districts <- ebirdsubregionlist("subnational2", parent_code, key = myebirdtoken)
+    
+    all_units <- list_countries %>% 
+      bind_rows(list_states) %>% 
+      bind_rows(list_districts) 
+    
+    list("list_countries" = list_countries,
+         "parent_code" = parent_code,
+         "list_states" = list_states,
+         "list_districts" = list_districts,
+         "all_units" = all_units) %>% 
+      list2env(envir = .GlobalEnv)
+    
+  }
   
-  
-  all_units <- unique(c(region_codes$COUNTRY.CODE, region_codes$STATE.CODE, region_codes$COUNTY.CODE))
-  if (!unit_code %in% all_units) {
+
+  if (!unit_code %in% all_units$code) {
     return("Input admin unit code is not a valid code!")
   }
   
+  # if country, we want only subnational1
+  req_adm2 <- if (unit_code %in% list_countries$code) FALSE else TRUE
   
   if (!hi_arch) {
     
@@ -37,17 +59,51 @@ get_admin_codes <- function(unit_code, hi_arch = TRUE) {
     
   } else {
     
-    countries <- region_codes %>% filter(str_detect(COUNTRY.CODE, unit_code)) %>% distinct(COUNTRY.CODE)
-    states <- region_codes %>% filter(str_detect(STATE.CODE, unit_code)) %>% distinct(STATE.CODE)
-    districts <- region_codes %>% filter(str_detect(COUNTY.CODE, unit_code)) %>% distinct(COUNTY.CODE)
-    
-    return(c(countries$COUNTRY.CODE, states$STATE.CODE, districts$COUNTY.CODE))
+    req_units <- all_units %>% 
+      filter(str_detect(code, parent_code)) %>% 
+      {if (req_adm2) {
+        .
+      } else {
+        anti_join(., list_districts, by = c("code", "name"))
+      }} %>% 
+      pull(code)
+
+    return(req_units)
     
   }
   
 }
 
-# eBird API functions ---------------------------------------------------------------
+get_admin_names <- function(region_input) {
+  
+  if (!exists("all_units")) {
+    list_countries <- ebirdsubregionlist("country", key = myebirdtoken)
+    
+    parent_code <- str_sub(unit_code, 1, 2)
+    list_states <- ebirdsubregionlist("subnational1", parent_code, key = myebirdtoken)
+    list_districts <- ebirdsubregionlist("subnational2", parent_code, key = myebirdtoken)
+    
+    all_units <- list_countries %>% 
+      bind_rows(list_states) %>% 
+      bind_rows(list_districts) 
+    
+    list("list_countries" = list_countries,
+         "parent_code" = parent_code,
+         "list_states" = list_states,
+         "list_districts" = list_districts,
+         "all_units" = all_units) %>% 
+      list2env(envir = .GlobalEnv)
+  }
+  
+  region_names <- all_units %>% 
+    filter(code %in% get_admin_codes(region_input, hi_arch = TRUE)) %>% 
+    magrittr::set_colnames(c("REGION", "REGION.NAME"))
+  
+  return(region_names)
+  
+}
+
+
 
 get_obs_count <- function(region, date = date_cur)
 {
@@ -63,10 +119,9 @@ get_obs_count <- function(region, date = date_cur)
   return(req)
 }
 
-write_obs_tally <- function(region)
+write_obs_tally <- function(region, date = date_cur)
 {  
-  print(paste(region, date_cur))
-  req <- get_obs_count(region, date = date_cur)
+  req <- get_obs_count(region, date)
   
   if(req$status_code == 200)
   {
@@ -78,7 +133,7 @@ write_obs_tally <- function(region)
     print ("Observer count returned error")
   }
   
-  regionStat <- cbind(region, parsed$numChecklists, parsed$numSpecies, parsed$numContributors)
+  regionStat <- cbind(region, parsed$numContributors, parsed$numChecklists, parsed$numSpecies)
   print(nrow(regionStat))
   print(regionStat)
   
@@ -100,10 +155,9 @@ get_spec_list <- function(region, date = date_cur)
   return(req)
 }
 
-write_spec_tally <- function(region)
+write_spec_tally <- function(region, date = date_cur)
 {  
-  print(region)
-  req <- get_spec_list(region, date = date_cur)
+  req <- get_spec_list(region, date)
   
   if(req$status_code == 200)
   {
@@ -136,7 +190,6 @@ get_notable_spec <- function(region, back, maxResults = 5) {
 
 write_notable_spec <- function(region)
 {  
-  print(region)
   req <- get_notable_spec(region)
   
   if(req$status_code == 200)
