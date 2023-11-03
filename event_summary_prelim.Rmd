@@ -1,0 +1,68 @@
+---
+title: "Event summary"
+author: "Bird Count India"
+date: "`r Sys.Date()`"
+output: word_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE)
+
+
+library(curl)
+library(tidyverse)
+library(lubridate)
+library(glue)
+library(writexl)
+library(rebird)
+# library(skimmr)
+
+# Get an eBird API token and assign it to object myebirdtoken
+source("token.R")
+source("scripts/functions.R")
+
+
+ebd <- read_csv("eBirdTaxonomy.csv")
+# soib <- read_csv("../soib-v2/01_analyses_full/results/SoIB_main.csv")
+
+
+# get required dates, admin units (MAKE MODIFICATIONS HERE)
+get_dates(seq(as_date("2022-11-04"), as_date("2022-11-07"), by = "days"))
+cur_region <- get_admin_codes("IN-NL", hi_arch = FALSE)
+cur_region_children <- get_admin_codes(cur_region, hi_arch = TRUE)
+
+```
+
+```{r data-processing, include=FALSE}
+
+# species lists & participation summaries
+spec_list_main <- gen_spec_list(cur_region, dates_cur)
+part_summ_main <- gen_part_summ(cur_region, dates_cur)
+
+spec_list_sub <- gen_spec_list(cur_region_children, dates_cur) %>% 
+  filter(REGION != cur_region)
+part_summ_sub <- gen_part_summ(cur_region_children, dates_cur) %>% 
+  filter(REGION != cur_region)
+
+```
+
+[Paragraph about event intro, coincidence with global event if so]
+
+**1507 birdwatchers** from India came together and documented **873 species** in **5,460 checklists**! Participants represented **34 states/union territories**(, provinces, and districts). 81 new eBirders participated in this event. In addition to this, [**2,458 photos** and **113 sound recordings**](https://media.ebird.org/catalog?mediaType=photo&sort=rating_rank_desc&obsDtFrom=2023-10-14&obsDtTo=2023-10-14&regionCode=IN) were uploaded to the Macaulay Library!
+
+[Placeholder for nice ML image]
+
+Thanks to all birdwatchers and nature enthusiasts from across the country who made this event a success. A special shout out to all those who took this opportunity to conduct public bird walks and introduce new people to the wonders of birds and nature!
+
+Table 1: Total number of lists uploaded from states/ union territories
+
+Table 2: Total number of species reported from states/ union territories
+
+[Placeholder for birding image]
+
+**Note:** This is just a summary and the final results will be published end of November 2023
+
+Thank you to everyone for interacting with the public and students, organising bird walks and talks, and promoting the joy of birdwatching!
