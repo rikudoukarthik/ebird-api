@@ -2,7 +2,10 @@
 title: "Event summary"
 author: "Bird Count India"
 date: "`r Sys.Date()`"
-output: word_document
+output: 
+  bookdown::word_document2:
+    fig_caption: yes
+    reference_docx: word_template.docx
 editor_options: 
   chunk_output_type: console
 ---
@@ -47,22 +50,138 @@ spec_list_sub <- gen_spec_list(cur_region_children, dates_cur) %>%
 part_summ_sub <- gen_part_summ(cur_region_children, dates_cur) %>% 
   filter(REGION != cur_region)
 
+
+# functions to create statements from summaries
+create_statement <- function(var) {
+  
+  if (var == "observers") {
+    
+    if (length(dates_cur) == 1) {
+      
+      number <- part_summ_main$OBSERVERS %>% as.integer()
+      string <- glue("**{number} birdwatchers** from India came together")
+      
+      return(string)
+      
+    } else if (length(dates_cur) > 1) {
+      
+      info <- part_summ_main %>% 
+        filter(TOTAL == "OBSERVERS") %>% 
+        dplyr::select(starts_with("DAY")) %>% 
+        pivot_longer(cols = everything(), names_to = "DAY.NO", values_to = "OBSERVERS") %>% 
+        mutate(MAX = max(OBSERVERS), 
+               MAX.WHEN = case_when(OBSERVERS == MAX ~ DAY.NO, 
+                                    TRUE ~ NA),
+               MIN = min(OBSERVERS),
+               NO.DAYS = n_distinct(DAY.NO)) %>% 
+        distinct(MAX, MAX.WHEN, MIN, NO.DAYS) %>% 
+        filter(!is.na(MAX.WHEN))
+      
+      string <- glue("**Everyday, at least {info$MIN} birdwatchers** from India came together for the {info$NO.DAYS} days ({info$MAX} birdwatchers on Day {info$MAX.WHEN %>% str_remove('DAY')}!),")
+      
+      return(string)
+      
+    }
+    
+  } else if (var == "species") {
+    
+    if (length(dates_cur) == 1) {
+      number <- part_summ_main$SPECIES %>% as.integer()
+    } else if (length(dates_cur) > 1) {
+      number <- part_summ_main %>% 
+        filter(TOTAL == "SPECIES") %>% 
+        pull(ALL.DAYS) %>% 
+        as.integer()
+    }
+    
+    string <- glue("**{number} species**")
+    return(string)
+    
+  } else if (var == "checklists") {
+    
+    if (length(dates_cur) == 1) {
+      number <- part_summ_main$CHECKLISTS %>% as.integer()
+    } else if (length(dates_cur) > 1) {
+      number <- part_summ_main %>% 
+        filter(TOTAL == "CHECKLISTS") %>% 
+        pull(ALL.DAYS) %>% 
+        as.integer()
+    }
+    
+    string <- glue("**{scales::label_comma()(number)} checklists**")
+    return(string)
+    
+  } else if (var == "subregions") {
+    
+    info <- part_summ_sub %>% 
+      {if (length(dates_cur) == 1) {
+        filter(., if_any(c("OBSERVERS", "CHECKLISTS", "SPECIES"), ~ .x > 0))
+      } else if (length(dates_cur) > 1) {
+        filter(., if_any(starts_with("DAY"), ~ .x > 0))
+      }} %>% 
+      reframe(NO.REG = n_distinct(REGION),
+              WHICH.REG = case_when(str_count(REGION, "-") == 1 ~ "states/union territories",
+                                    str_count(REGION, "-") == 2 ~ "districts",
+                                    TRUE ~ "UNKNOWN REGION")) %>% 
+      distinct(NO.REG, WHICH.REG)
+    
+    string <- glue("**{info$NO.REG} {info$WHICH.REG}**")
+    return(string)
+
+  }
+  
+}
+
+create_ML_link <- function() {
+  
+  prefix <- "https://media.ebird.org/catalog?mediaType=photo&sort=rating_rank_desc&obsDtFrom="
+  middle_todate <- "&obsDtTo="
+  middle_region <- "&regionCode="
+  
+  link <- glue("{prefix}{first(dates_cur)}{middle_todate}{last(dates_cur)}{middle_region}{cur_region}")
+  return(link)
+  
+}
+
+what_is_next_month <- function() {
+  next_date <- last(dates_cur) + months(1)
+  output <- glue("{month(next_date, label = TRUE, abbr = FALSE)} {year(next_date)}")
+  return(output)
+}
+
 ```
+
+```{r statements, include=FALSE}
+
+how_many_people <- create_statement("observers")
+how_many_species <- create_statement("species")
+how_many_lists <- create_statement("checklists")
+how_many_subregions <- create_statement("subregions")
+
+what_subregions <- how_many_subregions %>% 
+  str_extract_all("[:letter:]", simplify = TRUE) %>% 
+  str_flatten()
+
+link_to_ML <- create_ML_link()
+
+```
+
+<br>
 
 [Paragraph about event intro, coincidence with global event if so]
 
-**1507 birdwatchers** from India came together and documented **873 species** in **5,460 checklists**! Participants represented **34 states/union territories**(, provinces, and districts). 81 new eBirders participated in this event. In addition to this, [**2,458 photos** and **113 sound recordings**](https://media.ebird.org/catalog?mediaType=photo&sort=rating_rank_desc&obsDtFrom=2023-10-14&obsDtTo=2023-10-14&regionCode=IN) were uploaded to the Macaulay Library!
+`r how_many_people` and documented `r how_many_species` in `r how_many_lists`! Participants represented `r how_many_subregions`. In addition to this, [**2,458 photos** and **113 sound recordings**](`r link_to_ML`) were uploaded to the Macaulay Library!
 
 [Placeholder for nice ML image]
 
 Thanks to all birdwatchers and nature enthusiasts from across the country who made this event a success. A special shout out to all those who took this opportunity to conduct public bird walks and introduce new people to the wonders of birds and nature!
 
-Table 1: Total number of lists uploaded from states/ union territories
+Table 1: Total number of lists uploaded from `r what_subregions`
 
-Table 2: Total number of species reported from states/ union territories
+Table 2: Total number of species reported from `r what_subregions`
 
 [Placeholder for birding image]
 
-**Note:** This is just a summary and the final results will be published end of November 2023
-
 Thank you to everyone for interacting with the public and students, organising bird walks and talks, and promoting the joy of birdwatching!
+
+**Note:** This is a preliminary summary; the final results will be published at the end of `r what_is_next_month()`.
