@@ -70,55 +70,27 @@ server <- function(input, output) {
     
   # get list of species
   spec_list_adm1 <- reactive ({
-    get_admin_codes(input$region_code, hi_arch = FALSE) %>% 
-      map(~ write_spec_tally(.x, input$event_date)) %>% 
-      list_c() %>% 
-      as.data.frame() %>% 
-      magrittr::set_colnames(c("REGION", "ENGLISH.NAME")) %>% 
-      left_join(ebd) %>% 
-      arrange(REGION, SORT) %>% 
-      left_join(region_info()) %>% 
-      dplyr::select(REGION, REGION.NAME, ENGLISH.NAME)
+    get_admin_codes(input$region_code, hi_arch = FALSE) %>%
+      gen_spec_list(dates = input$event_date)
   })
   
   spec_list_adm2 <- reactive ({
-    get_admin_codes(input$region_code, hi_arch = TRUE) %>% 
-      map(~ write_spec_tally(.x, input$event_date)) %>% 
-      list_c() %>% 
-      as.data.frame() %>% 
-      magrittr::set_colnames(c("REGION", "ENGLISH.NAME")) %>% 
-      filter(REGION != input$region_code) %>% 
-      left_join(ebd) %>% 
-      arrange(REGION, SORT) %>% 
-      left_join(region_info()) %>% 
-      dplyr::select(REGION, REGION.NAME, ENGLISH.NAME)
+    get_admin_codes(input$region_code, hi_arch = TRUE) %>%
+      gen_spec_list(dates = input$event_date) %>%
+      filter(REGION != input$region_code)
   })
   
   # get participation stats
   
   basic_summary_adm1 <- reactive ({
-    get_admin_codes(input$region_code, hi_arch = FALSE) %>% 
-      map(~ write_obs_tally(.x, input$event_date)) %>% 
-      list_c() %>% 
-      as.data.frame() %>% 
-      magrittr::set_colnames(c("REGION", "OBSERVERS", "CHECKLISTS", "SPECIES")) %>% 
-      mutate(across(c(everything(), -REGION), ~ as.integer(.))) %>% 
-      arrange(desc(OBSERVERS), desc(SPECIES)) %>% 
-      left_join(region_info()) %>% 
-      relocate(REGION, REGION.NAME)
+    get_admin_codes(input$region_code, hi_arch = FALSE) %>%
+      gen_part_summ(dates = input$event_date)
   })
   
   basic_summary_adm2 <- reactive ({
-    get_admin_codes(input$region_code, hi_arch = TRUE) %>% 
-      map(~ write_obs_tally(.x, input$event_date)) %>% 
-      list_c() %>% 
-      as.data.frame() %>% 
-      magrittr::set_colnames(c("REGION", "OBSERVERS", "CHECKLISTS", "SPECIES")) %>% 
-      mutate(across(c(everything(), -REGION), ~ as.integer(.))) %>% 
-      arrange(desc(OBSERVERS), desc(SPECIES)) %>% 
-      filter(REGION != input$region_code) %>% 
-      left_join(region_info()) %>% 
-      relocate(REGION, REGION.NAME)
+    get_admin_codes(input$region_code, hi_arch = TRUE) %>%
+      gen_part_summ(dates = input$event_date) %>%
+      filter(REGION != input$region_code)
   })
   
   

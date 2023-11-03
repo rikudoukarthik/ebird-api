@@ -60,7 +60,7 @@ get_admin_codes <- function(unit_code, hi_arch = TRUE) {
   } else {
     
     req_units <- all_units %>% 
-      filter(str_detect(code, parent_code)) %>% 
+      filter(str_detect(code, unit_code)) %>% 
       {if (req_adm2) {
         .
       } else {
@@ -134,8 +134,8 @@ write_obs_tally <- function(region, date = date_cur)
   }
   
   regionStat <- cbind(region, parsed$numContributors, parsed$numChecklists, parsed$numSpecies)
-  print(nrow(regionStat))
-  print(regionStat)
+  # print(nrow(regionStat))
+  # print(regionStat)
   
   return(regionStat)
 }
@@ -204,5 +204,58 @@ write_notable_spec <- function(region)
   }
   
   return(speciesList)
+  
+}
+
+
+# higher-level API functions --------------------------------------------------------
+
+# uses above functions 
+
+
+# generate species list for given regions and dates
+
+# # for subnat2
+# get_admin_codes(input$region_code, hi_arch = TRUE) %>%
+#   gen_spec_list(dates = dates_cur) %>%
+#   filter(REGION != input$region_code) # if hi_arch == TRUE
+
+gen_spec_list <- function(regions, dates) {
+  
+  parent_code <- str_sort(regions)[1]
+  
+  regions %>% 
+      map(~ write_spec_tally(.x, dates)) %>% 
+      list_c() %>% 
+      as.data.frame() %>% 
+      magrittr::set_colnames(c("REGION", "ENGLISH.NAME")) %>% 
+      left_join(ebd) %>% 
+      arrange(REGION, SORT) %>% 
+      left_join(get_admin_names(parent_code), by = "REGION") %>% 
+      dplyr::select(REGION, REGION.NAME, ENGLISH.NAME)
+  
+}
+
+
+# generate participation summary for given regions and dates
+
+# # for subnat2
+# get_admin_codes(input$region_code, hi_arch = TRUE) %>%
+#   gen_part_summ(dates = dates_cur) %>%
+#   filter(REGION != input$region_code) # if hi_arch == TRUE
+
+gen_part_summ <- function(regions, dates) {
+  
+  parent_code <- str_sort(regions)[1]
+  
+  regions %>% 
+    map(~ write_obs_tally(.x, dates)) %>% 
+    list_c() %>% 
+    as.data.frame() %>% 
+    magrittr::set_colnames(c("REGION", "OBSERVERS", "CHECKLISTS", "SPECIES")) %>% 
+    mutate(across(c(everything(), -REGION), ~ as.integer(.))) %>% 
+    arrange(desc(OBSERVERS), desc(SPECIES)) %>% 
+    left_join(get_admin_names(parent_code), by = "REGION") %>% 
+    relocate(REGION, REGION.NAME)
   
 }
