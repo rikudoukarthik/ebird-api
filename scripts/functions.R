@@ -164,7 +164,7 @@ write_spec_tally <- function(region, date = date_cur)
     response <- jsonlite::prettify(rawToChar(req$content))
     parsed <- jsonlite::fromJSON(response, flatten = FALSE)
   }
-  speciesList <- cbind(region, parsed$comName)
+  speciesList <- cbind(region, comName = parsed$comName)
   
   if(is.null(parsed$comName)) {
     speciesList <- cbind(speciesList, comName = NA_real_)
@@ -224,15 +224,59 @@ gen_spec_list <- function(regions, dates) {
   
   parent_code <- str_sort(regions)[1]
   
-  regions %>% 
+  if (length(dates) == 1) {
+    
+    list_spec <- regions %>% 
       map(~ write_spec_tally(.x, dates)) %>% 
       list_c() %>% 
       as.data.frame() %>% 
       magrittr::set_colnames(c("REGION", "ENGLISH.NAME")) %>% 
-      left_join(ebd) %>% 
+      left_join(ebd, by = "ENGLISH.NAME") %>% 
       arrange(REGION, SORT) %>% 
       left_join(get_admin_names(parent_code), by = "REGION") %>% 
       dplyr::select(REGION, REGION.NAME, ENGLISH.NAME)
+    
+  } else if (length(dates) > 1) {
+    
+    regions_dates <- expand_grid(regions, dates) %>% 
+      magrittr::set_colnames(c("REGION", "DATE")) %>% 
+      arrange(DATE) %>% 
+      group_by(DATE) %>% 
+      mutate(DAY.NO = cur_group_id()) %>% 
+      ungroup()
+    
+    list_spec <- map2(regions_dates$REGION, regions_dates$DATE, 
+                      ~ write_spec_tally(.x, .y) %>% bind_cols(tibble(DATE = .y))) %>% 
+      list_c() %>% 
+      as.data.frame() %>% 
+      magrittr::set_colnames(c("REGION", "ENGLISH.NAME", "DATE")) %>% 
+      left_join(regions_dates %>% distinct(DATE, DAY.NO), 
+                by = "DATE") %>% 
+      left_join(ebd, by = "ENGLISH.NAME") %>% 
+      arrange(DAY.NO, REGION, SORT) %>% 
+      left_join(get_admin_names(parent_code), by = "REGION") %>%
+      dplyr::select(DAY.NO, REGION, REGION.NAME, ENGLISH.NAME) %>% # remove DATE for pivot
+      mutate(PRESENT = 1) %>% 
+      pivot_wider(names_from = "DAY.NO", names_glue = "DAY{DAY.NO}", values_from = "PRESENT") %>% 
+      mutate(across(starts_with("DAY"), ~ replace_na(., replace = 0))) %>% 
+      arrange(REGION, across(starts_with("DAY"), desc))
+    
+    # total species reported over all days
+    tot_spec_alldays <- list_spec %>% 
+      group_by(REGION) %>% 
+      reframe(TOT.SPEC = n_distinct(ENGLISH.NAME))
+    
+    list("tot_spec_alldays" = tot_spec_alldays) %>% list2env(envir = .GlobalEnv)
+    
+  }
+  
+  # list of SoIB High Priority
+  
+  
+  # list of endemics
+  
+  
+  return(list_spec)
   
 }
 
@@ -248,14 +292,76 @@ gen_part_summ <- function(regions, dates) {
   
   parent_code <- str_sort(regions)[1]
   
-  regions %>% 
-    map(~ write_obs_tally(.x, dates)) %>% 
-    list_c() %>% 
-    as.data.frame() %>% 
-    magrittr::set_colnames(c("REGION", "OBSERVERS", "CHECKLISTS", "SPECIES")) %>% 
-    mutate(across(c(everything(), -REGION), ~ as.integer(.))) %>% 
-    arrange(desc(OBSERVERS), desc(SPECIES)) %>% 
-    left_join(get_admin_names(parent_code), by = "REGION") %>% 
-    relocate(REGION, REGION.NAME)
+  if (length(dates) == 1) {
+    
+    summary_part <- regions %>% 
+      map(~ write_obs_tally(.x, dates)) %>% 
+      list_c() %>% 
+      as.data.frame() %>% 
+      magrittr::set_colnames(c("REGION", "OBSERVERS", "CHECKLISTS", "SPECIES")) %>% 
+      mutate(across(c("OBSERVERS", "CHECKLISTS", "SPECIES"), ~ as.integer(.))) %>% 
+      arrange(desc(OBSERVERS), desc(SPECIES)) %>% 
+      left_join(get_admin_names(parent_code), by = "REGION") %>% 
+      relocate(REGION, REGION.NAME)
+    
+  } else if (length(dates) > 1) {
+
+    regions_dates <- expand_grid(regions, dates) %>% 
+      magrittr::set_colnames(c("REGION", "DATE")) %>% 
+      arrange(DATE) %>% 
+      group_by(DATE) %>% 
+      mutate(DAY.NO = cur_group_id()) %>% 
+      ungroup()
+    
+    summary_part <- map2(regions_dates$REGION, regions_dates$DATE, 
+                         ~ write_obs_tally(.x, .y) %>% bind_cols(tibble(DATE = .y))) %>% 
+      list_c() %>% 
+      as.data.frame() %>% 
+      magrittr::set_colnames(c("REGION", "OBSERVERS", "CHECKLISTS", "SPECIES", "DATE")) %>% 
+      mutate(across(c("OBSERVERS", "CHECKLISTS", "SPECIES"), ~ as.integer(.))) %>% 
+      left_join(regions_dates %>% distinct(DATE, DAY.NO), 
+                by = "DATE") %>% 
+      arrange(DAY.NO, desc(OBSERVERS), desc(SPECIES)) %>% 
+      left_join(get_admin_names(parent_code), by = "REGION") %>%
+      relocate(DATE, DAY.NO, REGION, REGION.NAME) %>% 
+      pivot_longer(c(OBSERVERS, CHECKLISTS, SPECIES),
+                   names_to = "TOTAL", values_to = "VALUE") %>% 
+      dplyr::select(-DATE) %>% 
+      pivot_wider(names_from = "DAY.NO", names_glue = "DAY{DAY.NO}", values_from = "VALUE") %>% 
+      arrange(REGION)
+    
+    # adding all-day totals
+    if (exists("tot_spec_alldays")) {
+      
+      message(paste("Taking total species over all days from existing object in environment.",
+                    "(Is the correct object loaded for current regions and dates?)"))
+      
+      summary_part <- summary_part %>% 
+        left_join(tot_spec_alldays %>% mutate(TOTAL = "SPECIES"), 
+                  by = c("TOTAL", "REGION")) %>% 
+        mutate(ALL.DAYS = case_when(
+          TOTAL == "OBSERVERS" ~ "NA",
+          TOTAL == "CHECKLISTS" ~ rowSums(across(starts_with("DAY"))) %>% as.character(),
+          TOTAL == "SPECIES" ~ TOT.SPEC %>% as.character()
+        ),
+        TOT.SPEC = NULL)
+      
+    } else {
+      
+      warning(paste("Total species over all days can only be calculated after generating species lists.",
+                    "Returning NA."))
+      
+      summary_part <- summary_part %>% 
+        mutate(ALL.DAYS = case_when(
+          TOTAL == "OBSERVERS" ~ "NA",
+          TOTAL == "CHECKLISTS" ~ rowSums(across(starts_with("DAY"))) %>% as.character(),
+          TOTAL == "SPECIES" ~ "NA"
+        ))
+      
+    }
+    
+  }
+  
+  return(summary_part)
   
 }
