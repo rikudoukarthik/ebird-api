@@ -16,6 +16,7 @@ knitr::opts_chunk$set(echo = FALSE)
 
 
 library(curl)
+library(jsonlite)
 library(tidyverse)
 library(lubridate)
 library(glue)
@@ -163,6 +164,23 @@ what_subregions <- how_many_subregions %>%
   str_flatten()
 
 link_to_ML <- create_ML_link()
+
+library(rvest)
+
+webpage <- create_ML_link() %>% 
+  read_html() 
+
+webpage %>% 
+  html_elements(".mediaTypeButton") %>% 
+  html_elements(".stat") %>% 
+  # html_attrs("data-v-804f50dc") %>% 
+  .[[2]]
+  html_text2()
+  
+  webpage %>% 
+    html_attr("Audio")
+  
+  https://search.macaulaylibrary.org/api/v1/stats/media-count?DtFrom=2022-11-04&DtTo=2022-11-07&yr=YCUSTOM&mr=MCUSTOM&region=Nagaland%20(IN-NL)&regionCode=IN-NL&includeUnconfirmed=T
 
 ```
 

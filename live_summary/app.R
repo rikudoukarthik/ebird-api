@@ -1,5 +1,6 @@
 library(shiny)
 library(curl)
+library(jsonlite)
 library(tidyverse)
 library(lubridate)
 library(glue)
