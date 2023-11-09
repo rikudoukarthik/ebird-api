@@ -7,8 +7,8 @@ library(glue)
 library(writexl)
 library(rebird)
 
-# Get an eBird API token and assign it to object myebirdtoken
-source("token.R")
+
+source("token.R") # Get an eBird API token and assign it to object myebirdtoken
 source("scripts/functions.R")
 
 # for sort order of species
@@ -20,37 +20,41 @@ source("scripts/functions.R")
 ebd <- read_csv("eBirdTaxonomy.csv")
 
 
-# Define UI for app that draws a histogram ----
+# Define UI for app ----
 
 ui <- fluidPage(
   
-  # App title ----
+  # App title 
   titlePanel("Hello eBirder!"),
   
-  # Sidebar layout with input and output definitions ----
+  # Single vertical layout (no sidebar) with input and output definitions 
   verticalLayout(
     
-    # Input: Date selection (value always yyyy-mm-dd, even if display format different) ----
-    helpText(h4("Select the date of your event")),
+    # Input: Date selection (value always yyyy-mm-dd, even if display format different)
+    helpText(h4("Select the start and end dates of interest")),
     
-    dateInput(inputId = "event_date", 
-              label = "Event date", 
+    dateInput(inputId = "event_date_start", 
+              label = "Start date", 
               value = today()),
     
-    # Input: Region (admin unit) code ----
-    helpText(h4("Select the admin unit code for the region of interest")),
-    helpText("Summary will include selection and all admin units one level below selection"),
+    dateInput(inputId = "event_date_end", 
+              label = "End date", 
+              value = today()),
+    
+    # Input: Region (admin unit) code
+    helpText(h4("Select the administrative unit code for the region of interest")),
+    helpText("Summary will include selection and all admin. units one level below selection"),
     selectizeInput(inputId = "region_code", 
                    choices = c("Choose one" = "", 
                                get_admin_codes("IN")),
-                   selected = "", label = "Admin unit"), 
+                   selected = "", label = "Admin. unit"), 
     
-    # Input: Event code for save file name ----
+    # Input: Event code for save file name
     helpText(h4("Provide a short event code (for file downloads)")),
     textInput(inputId = "event_code", 
               value = glue("ABCD_{today() %>% year()}"), label = NULL), 
     
-    # Input: download button ----
+    # Input: download button 
     helpText(h4("Download your eBird summary!")),
     downloadButton("downloadData", "Download",
                    label = "Summary"),
@@ -60,24 +64,33 @@ ui <- fluidPage(
 )
 
 
-# Define server logic required to draw a histogram ----
+# Define server logic ----
 
 server <- function(input, output) {
+  
+  # dates (single or multi)
+  event_date <- reactive ({
+    if (input$event_date_start == input$event_date_end) {
+      event_date_start
+    } else {
+      seq(input$event_date_start, input$event_date_end, by = "days")
+    }
+  })
   
   region_info <- reactive ({
     get_admin_names(input$region_code)
   })
   
-    
+  
   # get list of species
   spec_list_adm1 <- reactive ({
     get_admin_codes(input$region_code, hi_arch = FALSE) %>%
-      gen_spec_list(dates = input$event_date)
+      gen_spec_list(dates = event_date())
   })
   
   spec_list_adm2 <- reactive ({
     get_admin_codes(input$region_code, hi_arch = TRUE) %>%
-      gen_spec_list(dates = input$event_date) %>%
+      gen_spec_list(dates = event_date()) %>%
       filter(REGION != input$region_code)
   })
   
@@ -85,22 +98,19 @@ server <- function(input, output) {
   
   basic_summary_adm1 <- reactive ({
     get_admin_codes(input$region_code, hi_arch = FALSE) %>%
-      gen_part_summ(dates = input$event_date)
+      gen_part_summ(dates = event_date())
   })
   
   basic_summary_adm2 <- reactive ({
     get_admin_codes(input$region_code, hi_arch = TRUE) %>%
-      gen_part_summ(dates = input$event_date) %>%
+      gen_part_summ(dates = event_date()) %>%
       filter(REGION != input$region_code)
   })
   
   
-  
-  # Reactive value for selected dataset (filter, summarise) ----
-
-  # Downloadable csv of selected dataset ----
+  # Downloadable .xlsx of selected dataset 
   output$downloadData <- downloadHandler(
-
+    
     filename = function(){glue("{input$event_code}_summary.xlsx")},
     content = function(file) {
       write_xlsx(list("Summary (overall)" = basic_summary_adm1(),
@@ -109,7 +119,7 @@ server <- function(input, output) {
                       "Species list (subregions)" = spec_list_adm2()), 
                  file)
     }
-
+    
   )
   
 }
