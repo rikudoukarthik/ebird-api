@@ -293,13 +293,6 @@ gen_spec_list <- function(regions, dates) {
       mutate(across(starts_with("DAY"), ~ replace_na(., replace = 0))) %>% 
       arrange(REGION, across(starts_with("DAY"), desc))
     
-    # total species reported over all days
-    tot_spec_alldays <- list_spec %>% 
-      group_by(REGION) %>% 
-      reframe(TOT.SPEC = n_distinct(ENGLISH.NAME))
-    
-    list("tot_spec_alldays" = tot_spec_alldays) %>% list2env(envir = .GlobalEnv)
-    
   }
   
   # list of SoIB High Priority
@@ -320,7 +313,7 @@ gen_spec_list <- function(regions, dates) {
 #   gen_part_summ(dates = dates_cur) %>%
 #   filter(REGION != input$region_code) # if hi_arch == TRUE
 
-gen_part_summ <- function(regions, dates) {
+gen_part_summ <- function(regions, dates, list_spec = NULL) {
   
   parent_code <- str_sort(regions)[1]
   
@@ -363,11 +356,13 @@ gen_part_summ <- function(regions, dates) {
       arrange(REGION)
     
     # adding all-day totals
-    if (exists("tot_spec_alldays")) {
+    if (exists("list_spec") & !is.null(list_spec)) {
       
-      message(paste("Taking total species over all days from existing object in environment.",
-                    "(Is the correct object loaded for current regions and dates?)"))
-      
+      # total species reported over all days
+      tot_spec_alldays <- list_spec %>% 
+        group_by(REGION) %>% 
+        reframe(TOT.SPEC = n_distinct(ENGLISH.NAME))
+
       summary_part <- summary_part %>% 
         left_join(tot_spec_alldays %>% mutate(TOTAL = "SPECIES"), 
                   by = c("TOTAL", "REGION")) %>% 
@@ -380,7 +375,7 @@ gen_part_summ <- function(regions, dates) {
       
     } else {
       
-      warning(paste("Total species over all days can only be calculated after generating species lists.",
+      warning(paste("Total species over all days can only be calculated from species lists.",
                     "Returning NA."))
       
       summary_part <- summary_part %>% 

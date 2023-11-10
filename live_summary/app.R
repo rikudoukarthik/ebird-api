@@ -98,12 +98,12 @@ server <- function(input, output) {
   
   basic_summary_adm1 <- reactive ({
     get_admin_codes(input$region_code, hi_arch = FALSE) %>%
-      gen_part_summ(dates = event_date())
+      gen_part_summ(dates = event_date(), list_spec = spec_list_adm1())
   })
   
   basic_summary_adm2 <- reactive ({
     get_admin_codes(input$region_code, hi_arch = TRUE) %>%
-      gen_part_summ(dates = event_date()) %>%
+      gen_part_summ(dates = event_date(), list_spec = spec_list_adm2()) %>%
       filter(REGION != input$region_code)
   })
   
