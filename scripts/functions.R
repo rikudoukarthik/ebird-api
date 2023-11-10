@@ -19,6 +19,32 @@ get_dates <- function(dates_cur = lubridate::today()) {
 }
 
 
+# add SoIB 2023 info
+map_to_soib <- function(data) {
+  
+  ebird_changes <- read_xlsx("data/eBird_2023_taxonomy_changes_IN.xlsx") %>% 
+    dplyr::select("OLD: eBird Name (default)", "NEW: eBird: English (default) Name") %>% 
+    magrittr::set_colnames(c("eBird.English.Name.2022", "eBird.English.Name.2023"))
+  
+  soib_2023 <- read_csv("../soib-v2/01_analyses_full/results/SoIB_main.csv") %>% 
+    dplyr::select(eBird.English.Name.2022, SOIBv2.Priority.Status, India.Endemic) 
+  
+  mapped <- data %>% 
+    left_join(ebird_changes, by = c("ENGLISH.NAME" = "eBird.English.Name.2023")) %>% 
+    mutate(eBird.English.Name.2022 = case_when(
+      is.na(eBird.English.Name.2022) ~ ENGLISH.NAME,
+      TRUE ~ eBird.English.Name.2022
+    )) %>% 
+    left_join(soib_2023) %>% 
+    dplyr::select(ENGLISH.NAME, SOIBv2.Priority.Status, India.Endemic) %>% 
+    mutate(SOIBv2.Priority.Status = factor(SOIBv2.Priority.Status,
+                                           levels = c("High", "Moderate", "Low"))) %>% 
+    arrange(SOIBv2.Priority.Status, desc(India.Endemic))
+  
+  return(mapped)
+}
+
+
 # eBird API functions ---------------------------------------------------------------
 
 # admin units based on eBird 
@@ -298,13 +324,7 @@ gen_spec_list <- function(regions, dates) {
       arrange(REGION, across(starts_with("DAY"), desc))
     
   }
-  
-  # list of SoIB High Priority
-  
-  
-  # list of endemics
-  
-  
+
   return(list_spec)
   
 }

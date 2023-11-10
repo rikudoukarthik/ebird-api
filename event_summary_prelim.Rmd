@@ -21,6 +21,7 @@ library(tidyverse)
 library(lubridate)
 library(glue)
 library(writexl)
+library(readxl)
 library(rebird)
 library(flextable)
 # library(skimmr)
@@ -53,6 +54,11 @@ spec_list_sub <- gen_spec_list(cur_region_children, dates_cur) %>%
 part_summ_sub <- gen_part_summ(cur_region_children, dates_cur, spec_list_sub) %>% 
   filter(REGION != cur_region)
 
+# notable species (SoIB)
+spec_list_notable <- map_to_soib(spec_list_main) %>% 
+  filter(SOIBv2.Priority.Status == "High") %>% 
+  slice_head(n = 10)
+
 # # media summaries (only for first admin unit)
 # media_summ_main <- get_media_summary(first(dates_cur), last(dates_cur))
 
@@ -61,10 +67,14 @@ create_statement <- function(var) {
   
   if (var == "observers") {
     
+    where <- get_admin_names(cur_region) %>% 
+      filter(REGION == cur_region) %>% 
+      pull(REGION.NAME)
+    
     if (length(dates_cur) == 1) {
       
       number <- part_summ_main$OBSERVERS %>% as.integer()
-      string <- glue("**{number} birdwatchers** from India came together")
+      string <- glue("**{number} birdwatchers** from {where} came together")
       
       return(string)
       
@@ -82,7 +92,7 @@ create_statement <- function(var) {
         distinct(MAX, MAX.WHEN, MIN, NO.DAYS) %>% 
         filter(!is.na(MAX.WHEN))
       
-      string <- glue("**Everyday, at least {info$MIN} birdwatchers** from India came together for the {info$NO.DAYS} days ({info$MAX} birdwatchers on Day {info$MAX.WHEN %>% str_remove('DAY')}!),")
+      string <- glue("**Everyday, at least {info$MIN} birdwatchers** from {where} came together for the {info$NO.DAYS} days ({info$MAX} birdwatchers on Day {info$MAX.WHEN %>% str_remove('DAY')}!),")
       
       return(string)
       
@@ -141,6 +151,22 @@ create_statement <- function(var) {
     string <- glue("**{info$photo} photos** and **{info$audio} sound recordings**")
     return(string)
 
+  } else if (var == "notable") {
+    
+    if (length(spec_list_notable) > 0) {
+      
+      info <- spec_list_notable %>% 
+        pull(ENGLISH.NAME) %>% 
+        str_flatten_comma()
+      
+      string <- glue("Among the species reported were the following classed as of High Priority in the [SoIB 2023 report](https://stateofindiasbirds.in/#soib_report): {info}.")
+      
+    } else {
+      string <- ""
+    }
+
+    return(string)
+
   }
   
 }
@@ -175,6 +201,8 @@ what_subregions <- how_many_subregions %>%
   str_extract_all("[:letter:]", simplify = TRUE) %>% 
   str_flatten()
 
+which_notable_species <- create_statement("notable")
+
 link_to_ML <- create_ML_link()
 
 disclaimer <- if (cur_event == "GBBC") {
@@ -189,7 +217,7 @@ disclaimer <- if (cur_event == "GBBC") {
 
 [Paragraph about event intro, coincidence with global event if so]
 
-`r how_many_people` and documented `r how_many_species` in `r how_many_lists`! Participants represented `r how_many_subregions`. 
+`r how_many_people` and documented `r how_many_species` in `r how_many_lists`! Participants represented `r how_many_subregions`. `r which_notable_species`
 
 ```{r, eval=FALSE}
 # In addition to this, [`r create_statement("media")`](`r link_to_ML`) were uploaded to the Macaulay Library!
@@ -230,6 +258,8 @@ part_summ_sub %>%
   fontsize(size = 8, part = "all") %>% 
   flextable::font(fontname = "Times New Roman", part = "all")
 ```
+
+<br>
 
 [Placeholder for birding image]
 
