@@ -22,6 +22,7 @@ library(lubridate)
 library(glue)
 library(writexl)
 library(rebird)
+library(flextable)
 # library(skimmr)
 
 # Get an eBird API token and assign it to object myebirdtoken
@@ -33,10 +34,11 @@ ebd <- read_csv("eBirdTaxonomy.csv")
 # soib <- read_csv("../soib-v2/01_analyses_full/results/SoIB_main.csv")
 
 
-# get required dates, admin units (MAKE MODIFICATIONS HERE)
-get_dates(seq(as_date("2022-11-04"), as_date("2022-11-07"), by = "days"))
+# get required dates, admin units (MAKE MODIFICATIONS HERE) ###
+get_dates(seq(as_date("2023-11-04"), as_date("2023-11-07"), by = "days"))
 cur_region <- get_admin_codes("IN-NL", hi_arch = FALSE)
 cur_region_children <- get_admin_codes(cur_region, hi_arch = TRUE)
+cur_event <- "notGBBC"
 
 ```
 
@@ -44,13 +46,15 @@ cur_region_children <- get_admin_codes(cur_region, hi_arch = TRUE)
 
 # species lists & participation summaries
 spec_list_main <- gen_spec_list(cur_region, dates_cur)
-part_summ_main <- gen_part_summ(cur_region, dates_cur)
+part_summ_main <- gen_part_summ(cur_region, dates_cur, spec_list_main)
 
 spec_list_sub <- gen_spec_list(cur_region_children, dates_cur) %>% 
   filter(REGION != cur_region)
-part_summ_sub <- gen_part_summ(cur_region_children, dates_cur) %>% 
+part_summ_sub <- gen_part_summ(cur_region_children, dates_cur, spec_list_sub) %>% 
   filter(REGION != cur_region)
 
+# media summaries (only for first admin unit)
+media_summ_main <- get_media_summary(first(dates_cur), last(dates_cur))
 
 # functions to create statements from summaries
 create_statement <- function(var) {
@@ -129,6 +133,14 @@ create_statement <- function(var) {
     string <- glue("**{info$NO.REG} {info$WHICH.REG}**")
     return(string)
 
+  } else if (var == "media") {
+    
+    info <- media_summ_main %>% 
+      mutate(across(everything(), ~ scales::label_comma()(.)))
+
+    string <- glue("**{info$photo} photos** and **{info$audio} sound recordings**")
+    return(string)
+
   }
   
 }
@@ -165,22 +177,26 @@ what_subregions <- how_many_subregions %>%
 
 link_to_ML <- create_ML_link()
 
-library(rvest)
+# library(rvest)
+# 
+# webpage <- create_ML_link() %>% 
+#   read_html() 
+# 
+# webpage %>% 
+#   html_elements(".mediaTypeButton") %>% 
+#   html_elements(".stat") %>% 
+#   # html_attrs("data-v-804f50dc") %>% 
+#   .[[2]]
+#   html_text2()
+#   
+#   webpage %>% 
+#     html_attr("Audio")
 
-webpage <- create_ML_link() %>% 
-  read_html() 
-
-webpage %>% 
-  html_elements(".mediaTypeButton") %>% 
-  html_elements(".stat") %>% 
-  # html_attrs("data-v-804f50dc") %>% 
-  .[[2]]
-  html_text2()
-  
-  webpage %>% 
-    html_attr("Audio")
-  
-  https://search.macaulaylibrary.org/api/v1/stats/media-count?DtFrom=2022-11-04&DtTo=2022-11-07&yr=YCUSTOM&mr=MCUSTOM&region=Nagaland%20(IN-NL)&regionCode=IN-NL&includeUnconfirmed=T
+disclaimer <- if (cur_event == "GBBC") {
+  glue("the final results will be published at the end of {what_is_next_month()}")
+} else {
+  "the final numbers may vary"
+}
 
 ```
 
@@ -188,18 +204,44 @@ webpage %>%
 
 [Paragraph about event intro, coincidence with global event if so]
 
-`r how_many_people` and documented `r how_many_species` in `r how_many_lists`! Participants represented `r how_many_subregions`. In addition to this, [**2,458 photos** and **113 sound recordings**](`r link_to_ML`) were uploaded to the Macaulay Library!
+`r how_many_people` and documented `r how_many_species` in `r how_many_lists`! Participants represented `r how_many_subregions`. In addition to this, [`r create_statement("media")`](`r link_to_ML`) were uploaded to the Macaulay Library!
 
 [Placeholder for nice ML image]
 
 Thanks to all birdwatchers and nature enthusiasts from across the country who made this event a success. A special shout out to all those who took this opportunity to conduct public bird walks and introduce new people to the wonders of birds and nature!
 
-Table 1: Total number of lists uploaded from `r what_subregions`
+```{r table1, tab.cap=glue("Total number of lists uploaded from {what_subregions}"), out.width="100%"}
+part_summ_sub %>% 
+  filter(TOTAL == "CHECKLISTS") %>% 
+  dplyr::select(-TOTAL) %>% 
+  arrange(desc(as.numeric(ALL.DAYS))) %>% 
+  flextable() %>% 
+  set_table_properties(layout = "autofit") %>% 
+  align(align = "center", part = "all") %>%
+  align(align = "left", j = c("REGION", "REGION.NAME"), part = "all") %>%
+  line_spacing(space = 1, part = "all") %>% 
+  padding(padding = 1.5, part = "body") %>%
+  fontsize(size = 8, part = "all") %>% 
+  flextable::font(fontname = "Times New Roman", part = "all")
+```
 
-Table 2: Total number of species reported from `r what_subregions`
+```{r table2, tab.cap=glue("Total number of species reported from {what_subregions}"), out.width="100%"}
+part_summ_sub %>% 
+  filter(TOTAL == "SPECIES") %>% 
+  dplyr::select(-TOTAL) %>% 
+  arrange(desc(as.numeric(ALL.DAYS))) %>% 
+  flextable() %>% 
+  set_table_properties(layout = "autofit") %>% 
+  align(align = "center", part = "all") %>%
+  align(align = "left", j = c("REGION", "REGION.NAME"), part = "all") %>%
+  line_spacing(space = 1, part = "all") %>% 
+  padding(padding = 1.5, part = "body") %>%
+  fontsize(size = 8, part = "all") %>% 
+  flextable::font(fontname = "Times New Roman", part = "all")
+```
 
 [Placeholder for birding image]
 
 Thank you to everyone for interacting with the public and students, organising bird walks and talks, and promoting the joy of birdwatching!
 
-**Note:** This is a preliminary summary; the final results will be published at the end of `r what_is_next_month()`.
+**Note:** This is a preliminary summary; `r disclaimer`.

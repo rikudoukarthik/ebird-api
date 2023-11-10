@@ -210,27 +210,31 @@ write_notable_spec <- function(region) {
 # adapted from PJ's code in ebird-datasets/BCI-metrics
 get_media_summary <- function(date_start, date_end) {
   
+  # load token for media
+  source("token_media.R")
+  
   h <- new_handle()
   
   region_info <- get_admin_names(cur_region) %>% filter(REGION == cur_region)
   
-  address_url <- "https://search.macaulaylibrary.org/api/v1/stats/media-count?yr=YCUSTOM&mr=MCUSTOM&"
-  address_part1 <- glue("bmo={month(date_start)}&by={year(date_start)}&emo={month(date_end)}&ey={year(date_end)}")
-  address_part2 <- glue("&region={region_info$REGION.NAME}%20({region_info$REGION})&regionCode={region_info$REGION}")
-  address_part3 <- glue("&includeUnconfirmed=T")
+  address_url <- "https://media.ebird.org/api/v2/stats/media-count?"
+  address_part1 <- glue("obsDtFrom={date_start}&obsDtTo={date_end}")
+  address_part2 <- glue("&regionCode={region_info$REGION}")
+  address_part3 <- "&unconfirmed=incl&birdOnly=true"
   address_API <- glue("{address_url}{address_part1}{address_part2}{address_part3}")
   
-  handle_setheaders(h, "X-eBirdApiToken" = myebirdtoken)
+  handle_setheaders(h, "X-eBirdApiToken" = mediatoken)
   retries <- 0
-  while (retries < 5) {
+  while (retries < 20) {
     req <- curl_fetch_memory(address_API, h)
     Sys.sleep(3)
 
     if (req$status_code == 200) {
       mediaSummary <- jsonlite::prettify(rawToChar(req$content)) %>% 
         fromJSON(flatten = FALSE) %>%
-        as.data.frame()
-      return (mediaSummary)
+        as.data.frame() %>% 
+        relocate(photo, audio, video)
+      return(mediaSummary)
     } else {
       print("HTTP GET returned error. Retrying...")
       retries <- retries + 1
