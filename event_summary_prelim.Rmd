@@ -53,8 +53,8 @@ spec_list_sub <- gen_spec_list(cur_region_children, dates_cur) %>%
 part_summ_sub <- gen_part_summ(cur_region_children, dates_cur, spec_list_sub) %>% 
   filter(REGION != cur_region)
 
-# media summaries (only for first admin unit)
-media_summ_main <- get_media_summary(first(dates_cur), last(dates_cur))
+# # media summaries (only for first admin unit)
+# media_summ_main <- get_media_summary(first(dates_cur), last(dates_cur))
 
 # functions to create statements from summaries
 create_statement <- function(var) {
@@ -177,21 +177,6 @@ what_subregions <- how_many_subregions %>%
 
 link_to_ML <- create_ML_link()
 
-# library(rvest)
-# 
-# webpage <- create_ML_link() %>% 
-#   read_html() 
-# 
-# webpage %>% 
-#   html_elements(".mediaTypeButton") %>% 
-#   html_elements(".stat") %>% 
-#   # html_attrs("data-v-804f50dc") %>% 
-#   .[[2]]
-#   html_text2()
-#   
-#   webpage %>% 
-#     html_attr("Audio")
-
 disclaimer <- if (cur_event == "GBBC") {
   glue("the final results will be published at the end of {what_is_next_month()}")
 } else {
@@ -204,7 +189,11 @@ disclaimer <- if (cur_event == "GBBC") {
 
 [Paragraph about event intro, coincidence with global event if so]
 
-`r how_many_people` and documented `r how_many_species` in `r how_many_lists`! Participants represented `r how_many_subregions`. In addition to this, [`r create_statement("media")`](`r link_to_ML`) were uploaded to the Macaulay Library!
+`r how_many_people` and documented `r how_many_species` in `r how_many_lists`! Participants represented `r how_many_subregions`. 
+
+```{r, eval=FALSE}
+# In addition to this, [`r create_statement("media")`](`r link_to_ML`) were uploaded to the Macaulay Library!
+```
 
 [Placeholder for nice ML image]
 
@@ -224,6 +213,8 @@ part_summ_sub %>%
   fontsize(size = 8, part = "all") %>% 
   flextable::font(fontname = "Times New Roman", part = "all")
 ```
+
+<br>
 
 ```{r table2, tab.cap=glue("Total number of species reported from {what_subregions}"), out.width="100%"}
 part_summ_sub %>% 
