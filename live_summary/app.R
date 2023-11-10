@@ -68,60 +68,77 @@ ui <- fluidPage(
 
 server <- function(input, output) {
   
-  # dates (single or multi)
-  event_date <- reactive ({
-    if (input$event_date_start == input$event_date_end) {
-      event_date_start
-    } else {
-      seq(input$event_date_start, input$event_date_end, by = "days")
-    }
-  })
-  
-  region_info <- reactive ({
-    get_admin_names(input$region_code)
-  })
-  
-  
-  # get list of species
-  spec_list_adm1 <- reactive ({
-    get_admin_codes(input$region_code, hi_arch = FALSE) %>%
-      gen_spec_list(dates = event_date())
-  })
-  
-  spec_list_adm2 <- reactive ({
-    get_admin_codes(input$region_code, hi_arch = TRUE) %>%
-      gen_spec_list(dates = event_date()) %>%
-      filter(REGION != input$region_code)
-  })
-  
-  # get participation stats
-  
-  basic_summary_adm1 <- reactive ({
-    get_admin_codes(input$region_code, hi_arch = FALSE) %>%
-      gen_part_summ(dates = event_date(), list_spec = spec_list_adm1())
-  })
-  
-  basic_summary_adm2 <- reactive ({
-    get_admin_codes(input$region_code, hi_arch = TRUE) %>%
-      gen_part_summ(dates = event_date(), list_spec = spec_list_adm2()) %>%
-      filter(REGION != input$region_code)
-  })
-  
-  
-  # Downloadable .xlsx of selected dataset 
-  output$downloadData <- downloadHandler(
+    # dates (single or multi)
+    event_date <- reactive ({
+      if (input$event_date_start == input$event_date_end) {
+        input$event_date_start
+      } else {
+        seq(input$event_date_start, input$event_date_end, by = "days")
+      }
+    })
     
-    filename = function(){glue("{input$event_code}_summary.xlsx")},
-    content = function(file) {
-      write_xlsx(list("Summary (overall)" = basic_summary_adm1(),
-                      "Summary (subregions)" = basic_summary_adm2(),
-                      "Species list (overall)" = spec_list_adm1(),
-                      "Species list (subregions)" = spec_list_adm2()), 
-                 file)
-    }
+    region_info <- reactive ({
+      get_admin_names(input$region_code)
+    })
     
-  )
-  
+    
+    # get list of species
+    spec_list_adm1 <- reactive ({
+      get_admin_codes(input$region_code, hi_arch = FALSE) %>%
+        gen_spec_list(dates = event_date())
+    })
+    
+    spec_list_adm2 <- reactive ({
+      get_admin_codes(input$region_code, hi_arch = TRUE) %>%
+        gen_spec_list(dates = event_date()) %>%
+        filter(REGION != input$region_code)
+    })
+
+    # get participation stats
+    
+    basic_summary_adm1 <- reactive ({
+      get_admin_codes(input$region_code, hi_arch = FALSE) %>%
+        gen_part_summ(dates = event_date(), list_spec = spec_list_adm1())
+    })
+    
+    basic_summary_adm2 <- reactive ({
+      get_admin_codes(input$region_code, hi_arch = TRUE) %>%
+        gen_part_summ(dates = event_date(), list_spec = spec_list_adm2()) %>%
+        filter(REGION != input$region_code)
+    })
+    
+    
+    # Downloadable .xlsx of selected dataset 
+    output$downloadData <- downloadHandler(
+      
+      filename = function(){glue("{input$event_code}_summary.xlsx")},
+      content = function(file) {
+        
+        withProgress(message = "Calculating summaries", value = 0, {
+          
+          Sys.sleep(1)
+          
+          data3 <- spec_list_adm1()    
+          incProgress(0.25)
+          data1 <- basic_summary_adm1()
+          incProgress(0.25)
+          data4 <- spec_list_adm2()    
+          incProgress(0.25)
+          data2 <- basic_summary_adm2()    
+          incProgress(0.25)
+
+          write_xlsx(list("Summary (overall)" = data1,
+                          "Summary (subregions)" = data2,
+                          "Species list (overall)" = data3,
+                          "Species list (subregions)" = data4), 
+                     file)
+          
+        })
+        
+      }
+      
+    )
+
 }
 
 # Define app ----
