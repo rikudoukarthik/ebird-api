@@ -228,10 +228,15 @@ disclaimer <- if (cur_event == "GBBC") {
 Thanks to all birdwatchers and nature enthusiasts from across the country who made this event a success. A special shout out to all those who took this opportunity to conduct public bird walks and introduce new people to the wonders of birds and nature!
 
 ```{r table1, tab.cap=glue("Total number of lists uploaded from {what_subregions}"), out.width="100%"}
-part_summ_sub %>% 
+
+tab1 <- part_summ_sub %>% 
   filter(TOTAL == "CHECKLISTS") %>% 
   dplyr::select(-TOTAL) %>% 
-  arrange(desc(as.numeric(ALL.DAYS))) %>% 
+  arrange(desc(as.numeric(ALL.DAYS)))
+
+write_csv(tab1, "event_summary_prelim_tab1.csv")
+
+tab1 %>% 
   flextable() %>% 
   set_table_properties(layout = "autofit") %>% 
   align(align = "center", part = "all") %>%
@@ -240,15 +245,21 @@ part_summ_sub %>%
   padding(padding = 1.5, part = "body") %>%
   fontsize(size = 8, part = "all") %>% 
   flextable::font(fontname = "Times New Roman", part = "all")
+
 ```
 
 <br>
 
 ```{r table2, tab.cap=glue("Total number of species reported from {what_subregions}"), out.width="100%"}
-part_summ_sub %>% 
+
+tab2 <- part_summ_sub %>% 
   filter(TOTAL == "SPECIES") %>% 
   dplyr::select(-TOTAL) %>% 
-  arrange(desc(as.numeric(ALL.DAYS))) %>% 
+  arrange(desc(as.numeric(ALL.DAYS)))
+
+write_csv(tab2, "event_summary_prelim_tab2.csv")
+
+tab2 %>% 
   flextable() %>% 
   set_table_properties(layout = "autofit") %>% 
   align(align = "center", part = "all") %>%
@@ -257,6 +268,7 @@ part_summ_sub %>%
   padding(padding = 1.5, part = "body") %>%
   fontsize(size = 8, part = "all") %>% 
   flextable::font(fontname = "Times New Roman", part = "all")
+
 ```
 
 <br>
