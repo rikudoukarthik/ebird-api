@@ -36,10 +36,10 @@ ebd <- read_csv("eBirdTaxonomy.csv")
 
 
 # get required dates, admin units (MAKE MODIFICATIONS HERE) ###
-get_dates(seq(as_date("2023-11-04"), as_date("2023-11-07"), by = "days"))
-cur_region <- get_admin_codes("IN-NL", hi_arch = FALSE)
+get_dates(seq(as_date("2024-02-16"), as_date("2024-02-19"), by = "days"))
+cur_region <- get_admin_codes("IN", hi_arch = FALSE)
 cur_region_children <- get_admin_codes(cur_region, hi_arch = TRUE)
-cur_event <- "notGBBC"
+cur_event <- "GBBC"
 
 ```
 
@@ -74,7 +74,7 @@ create_statement <- function(var) {
     if (length(dates_cur) == 1) {
       
       number <- part_summ_main$OBSERVERS %>% as.integer()
-      string <- glue("**{number} birdwatchers** from {where} came together")
+      string <- glue("**{scales::label_comma()(number)} birdwatchers** from {where} came together")
       
       return(string)
       
@@ -92,7 +92,7 @@ create_statement <- function(var) {
         distinct(MAX, MAX.WHEN, MIN, NO.DAYS) %>% 
         filter(!is.na(MAX.WHEN))
       
-      string <- glue("**Everyday, at least {info$MIN} birdwatchers** from {where} came together for the {info$NO.DAYS} days ({info$MAX} birdwatchers on Day {info$MAX.WHEN %>% str_remove('DAY')}!),")
+      string <- glue("**Everyday, at least {scales::label_comma()(info$MIN)} birdwatchers** from {where} came together for the {info$NO.DAYS} days ({scales::label_comma()(info$MAX)} birdwatchers on Day {info$MAX.WHEN %>% str_remove('DAY')}!),")
       
       return(string)
       
@@ -109,7 +109,7 @@ create_statement <- function(var) {
         as.integer()
     }
     
-    string <- glue("**{number} species**")
+    string <- glue("**{scales::label_comma()(number)} species**")
     return(string)
     
   } else if (var == "checklists") {
